@@ -1,0 +1,14 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+.env
+工作数据/
+选片/
+*.sqlite*
+*.3[Ff][Rr]
+*.[Hh][Ee][Ii][Cc]
+*.[Hh][Ee][Ii][Ff]
+*.[Jj][Pp][Gg]
+*.[Jj][Pp][Ee][Gg]
+*.phos
