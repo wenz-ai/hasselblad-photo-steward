@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
-let data, groups, groupIndex=0, other=1, page=0, view='picks', order='default', month='', locked=false, selection={};
-const views={ai:'AI 选片',picks:'分享精选',compare:'相似对照',review:'淘汰候选',all:'全部照片',queue:'移除清单'};
+let data, groups, groupIndex=0, other=1, page=0, view='compare', order='default', month='', locked=false, selection={};
+const views={compare:'相似选片',ai:'AI 选片',review:'淘汰候选',picks:'分享精选',all:'全部照片',queue:'移除清单'};
 const paths={ai:'M4 4h16v16H4z M8 14l2-5 2 5 M9 12h2 M16 9v5',picks:'m12 3 2.5 5.4 5.8.8-4.2 4.1 1 5.8-5.1-2.8-5.1 2.8 1-5.8-4.2-4.1 5.8-.8z',compare:'M3 5h8v14H3z M14 5h7v14h-7z',review:'M3 4h18v16H3z M3 16l5-5 4 3 3-3 6 6',all:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',queue:'M4 7h16 M8 7V4h8v3 M6 7l1 13h10l1-13 M10 10v7 M14 10v7'};
 const icon=k=>'<svg aria-hidden="true" class="ico" viewBox="0 0 24 24"><path d="'+paths[k]+'"/></svg>';
 const chosen=r=>data.picks[r.id]??Boolean(r.pick);
@@ -57,8 +57,8 @@ function card(r, role=''){
  '<button class="'+(role?'picture':'gridpic')+'" data-act="zoom" data-id="'+id+'" aria-label="放大 '+name+'"><img loading="'+(role?'eager':'lazy')+'" src="'+source(r)+'" alt="'+name+'"></button>'+
  '<div class="caption"><div class="cardtop"><strong>'+name+'</strong><span class="score">'+score+' <small>'+scoreType+'</small></span></div>'+
  '<p class="meta">'+(role?r.date.slice(11)+'　'+esc(r.lens)+'　f/'+r.aperture+'　'+r.shutter+' s':r.date.slice(0,10)+'　'+formats(r)+'　'+esc(status))+'</p>'+
- (note?'<p class="brief">'+esc(note)+'</p>':'')+
- '<div class="actions">'+button('why','为什么',r.id,'why-link')+compareLink+pick+button(queued?'unqueue':'queue',queued?'撤回移除':'待移除',r.id,queued?'marked':'quiet')+'</div></div></article>';
+ (!role&&note?'<p class="brief">'+esc(note)+'</p>':'')+
+ (role?'':'<details class="inline-review" data-photo="'+id+'"><summary>查看评片卡</summary>'+scorecard(r)+(!Number.isFinite(ai?.exposure)?button('aiOne','AI 看这张',r.id,'one-review'):'')+'</details><div class="actions">'+compareLink+pick+button(queued?'unqueue':'queue',queued?'撤回移除':'待移除',r.id,queued?'marked':'quiet')+'</div>')+'</div></article>';
 }
 function pager(index,len,prev,next,word){
  return '<div class="navcontrol"><button aria-label="上一'+word+'" data-act="'+prev+'">‹</button><span>'+(index+1)+' / '+len+' '+word+'</span><button aria-label="下一'+word+'" data-act="'+next+'">›</button></div>';
@@ -82,12 +82,14 @@ function compareView(g){
  const base=anchorIndex(g);anchorId=g[base].id;
  if(!g[other]||other===base)other=g.findIndex(r=>r.id!==anchorId);
  const selected=g.filter(chosen);
- const toolbar='<div class="compare-tools"><label class="group-menu"><span>'+g[0].date.slice(0,10)+'　/　'+g.length+' 张</span><select aria-label="跳到相似组" id="groupSel">'+groups.map((v,i)=>'<option value="'+i+'" '+(i===groupIndex?'selected':'')+'>'+esc(v[0].name)+'　'+v[0].date.slice(0,10)+'　'+v.length+' 张</option>').join('')+'</select></label><div>'+button('swap','右图设为参照')+button('detail',detailZoom?'回到全图':'同步放大 2×')+'</div></div>';
+ const toolbar='<div class="compare-tools"><label class="group-menu"><span>'+g[0].date.slice(0,10)+'　/　'+g.length+' 张</span><select aria-label="跳到相似组" id="groupSel">'+groups.map((v,i)=>'<option value="'+i+'" '+(i===groupIndex?'selected':'')+'>'+esc(v[0].name)+'　'+v[0].date.slice(0,10)+'　'+v.length+' 张</option>').join('')+'</select></label><div>'+button('aiPair',aiBusy?'评审进行中':'AI 看这两张')+button('swap','右图设为参照')+button('detail',detailZoom?'回到全图':'同步放大 2×')+'</div></div>';
  const strip=captureOrder(g).map(i=>{const r=g[i];return '<button class="thumb '+(i===other?'on':i===base?'anchor':'')+'" data-act="other" data-id="'+i+'" '+(i===base?'disabled':'')+' aria-label="'+esc(r.name)+(i===base?'，参照':'，切换对照')+'"><img src="'+source(r)+'" alt=""><span>'+esc(r.name)+(i===base?' · 参照':chosen(r)?' ★':'')+'</span></button>'}).join('');
- return '<div class="heading"><h1>相似对照</h1>'+pager(groupIndex,groups.length,'gp','gn','组')+'</div>'+toolbar+
+ $('sideStrip').innerHTML='<div class="strip-title">本组底片 <span>'+g.length+'</span></div><div class="side-film">'+strip+'</div>';
+ return '<div class="heading"><h1>相似选片</h1>'+pager(groupIndex,groups.length,'gp','gn','组')+'</div>'+toolbar+(aiProgress?'<p class="pair-progress" role="status">'+esc(aiProgress)+'</p>':'')+
  '<div class="compare '+(detailZoom?'magnified':'')+'">'+card(g[base],'参照')+card(g[other],'对照')+'</div>'+
  '<div class="decision"><div><strong>本组分享精选</strong><p>'+ (selected.length?selected.map(r=>esc(r.name)).join('、'):'尚未入选')+'</p></div><div class="decision-buttons">'+button('selectLeft','只选左图','',selected.length===1&&chosen(g[base])?'choice-on':'')+button('selectBoth','两张都选','',selected.length===2&&chosen(g[base])&&chosen(g[other])?'choice-on':'')+button('selectRight','只选右图','',selected.length===1&&chosen(g[other])?'choice-on':'')+'</div></div>'+
- '<div class="railtitle"><b>本组底片</b><span>← → 换片　⇧ ← → 换组</span></div><div class="rail">'+strip+'</div>'+
+ '<div class="scorepair">'+[g[base],g[other]].map(r=>'<div><div class="rating-for"><strong>评片卡</strong><span>'+esc(r.name)+'</span></div>'+scorecard(r)+'</div>').join('')+'</div>'+
+ '<div class="railtitle mobile-strip"><b>本组底片</b><span>← → 换片　⇧ ← → 换组</span></div><div class="rail mobile-strip">'+strip+'</div>'+
  '<div class="toolbar">'+button('aiGroup','用 AI 复核本组',g[base].id,'smallbtn')+'</div>';
 }
 function studioPreview(sets){
@@ -107,10 +109,15 @@ function render(){
  const sets=listState();
  $('total').innerHTML=sets.all.length+' 张照片';
  $('nav').innerHTML=Object.entries(views).map(([k,label])=>'<button class="navbtn '+(k===view?'on':'')+'" data-act="view" data-id="'+k+'" '+(k===view?'aria-current="page"':'')+'>'+icon(k)+label+'<b>'+sets[k].length+'</b></button>').join('');
- const stage=$('stage');
+ const stage=$('stage');$('sideStrip').replaceChildren();
  if(view==='compare' && groups.length){
    groupIndex=Math.min(groupIndex,groups.length-1);
    stage.innerHTML=compareView(groups[groupIndex]);
+   const strip=$('sideStrip'), active=strip.querySelector('.thumb.on');
+   if(active && strip.clientHeight){
+    const offset=active.getBoundingClientRect().bottom-strip.getBoundingClientRect().bottom;
+    if(offset>0)strip.scrollTop+=offset+4;
+   }
    return;
  }
  let items=[...sets[view]];
@@ -136,10 +143,12 @@ async function post(url,body){
 }
 async function action(act,id){
  if(locked)return;
+ if(act==='aiOne')return prepareAI('one',id);
+ if(act==='aiPair')return prepareAI('pair');
  if(act==='aiTrial'||act==='aiAll'||act==='aiGroup')return prepareAI({aiTrial:'trial',aiAll:'all',aiGroup:'group'}[act],id);
  if(act==='aiStop'){stopAI=true;aiProgress='本批结束后暂停';render();return}
  const r=data.rows.find(v=>v.id===id);
- if(act==='why'){$('whyContent').dataset.active=r.id;return showWhy(r)}
+
  if(act==='zoom'&&detailZoom&&view==='compare'){return}
  if(act==='zoom'){$('zoomImage').src=source(r);$('zoomImage').alt=r.name;$('zoomCaption').textContent=r.name+'　'+r.date+'　'+formats(r);$('zoom').showModal();return}
  if(act==='confirm'){
@@ -148,7 +157,7 @@ async function action(act,id){
   $('confirmDialog').showModal();return;
  }
  if(act==='compareGroup'){enterGroup(groups.findIndex(g=>g[0].group===r.group),id)}
- else if(act==='view'){view=id;page=0;month='';order='default'}
+ else if(act==='view'){setMenu(false);view=id;page=0;month='';order='default'}
  else if(act==='other'){other=Number(id)}
  else if(act==='stepBack'||act==='stepNext'){stepFrame(act==='stepNext'?1:-1)}
  else if(act==='swap'){const g=groups[groupIndex];const old=anchorIndex(g);anchorId=g[other].id;other=old}
@@ -190,45 +199,61 @@ function policyDescription(plan){
  return '<p>策略 v'+esc(plan.policy)+'，按拍摄组和时间分批，每批最多 6 张。模型只能比较同批预览。</p>'+auditCopy(plan.prompt)+
  '<details><summary>查看 '+plan.jobs.length+' 批照片的文件名</summary>'+auditCopy(groupNames)+'</details>';
 }
-async function showWhy(r){
- const area=$('whyContent'), dlg=$('whyDialog');
- area.replaceChildren();
- const ai=data.ai?.[r.id];
- if(!dlg.open)dlg.showModal();
- let top='<h2>'+esc(r.name)+' · 为什么</h2>';
- if(ai){
-  top+='<section><h3>AI '+esc(ai.decision)+'　'+ai.score+' 分</h3><p>'+esc(ai.reason)+'</p>';
-  for(const [key,label,limit] of [['moment','主体与瞬间',40],['composition','构图与背景',30],['quality','可见技术表现',30]]){
-   top+='<p><b>'+label+'　'+ai[key]+' / '+limit+'</b><br>'+esc(ai[key+'_reason']||'此版本未记录分项观察。')+'</p>';
-  }
-  if(ai.alternative)top+='<p><b>另一种取舍</b><br>'+esc(ai.alternative)+'</p>';
-  if(ai.uncertainty)top+='<p><b>判断限制</b><br>'+esc(ai.uncertainty)+'</p>';
-  top+='</section>';
+const dimensions=[['exposure','曝光'],['focus','对焦'],['composition','构图'],['aesthetics','审美']];
+const zones=['左上','上方中央','右上','左侧','中央','右侧','左下','下方中央','右下'];
+function localReading(r, key){
+ const m=r.meter;
+ if(key==='exposure'){
+  if(!m)return '预览的明暗跨度为 '+r.spread+' / 255。';
+  const tone=m.mid<65?'画面以暗调为主':m.mid>173?'画面以亮调为主':'画面以中间调为主';
+  return tone+'。'+(m.bright>.08?'有大片接近纯白，建议检查亮部细节。':m.dark>.18?'暗处较多，建议看主体是否还有轮廓。':r.spread<75?'大部分像素亮度接近，明暗反差较低。':'亮暗之间有层次，需结合主体判断曝光。');
  }
- const evidence=reviewEvidence(r);
- top+='<section><h3>本地初筛　'+r.score+' 技术分</h3><p>'+esc(r.reason)+'。'+
- (r.count>1?'同组 '+r.count+' 张，本张建议顺序 '+r.rank+'。':'单张画面。')+'</p>'+evidence+
- '<details class="breakdown"><summary>本地规则与适用范围</summary><p>先按拍摄时间寻找 10 分钟内的候选，比较明暗布局和颜色；3 分钟内的近似构图还会核对局部特征。初排按相机星级、技术分排序，5 张以上通常留 2 张，其余组留 1 张。保存过的看图备注显示在上方。</p>'+
- '<p>在最长边 560 像素的预览上测量。将图分 36 块，取局部边缘强度的第 80 百分位 D。亮度跨度 L 为第 95 与第 5 百分位之差。C 为灰度低于 6 或高于 249 的像素比例。</p>'+
- auditCopy('51 + 10 × log₂(max(1, D) / 4)\n+ 8 × min(1, L / 150)\n− 35 × max(0, C − 0.06)')+
- '<p>限制在 12–98 后取整。本张 D ≈ '+r.detail+'，L ≈ '+r.spread+'，C ≈ '+(r.clip*100).toFixed(2)+'%。</p></details></section>';
- if(!ai)top+='<p>此照片还没有 AI 评审。上面显示本机初筛记录。</p>';
- area.innerHTML=top;
- if(!ai?.signature)return;
+ if(key==='focus')return '预览'+(m?'的'+zones[m.textureZone]+'纹理最明显':'只有全图边缘测量')+'；主体是否合焦需放大看。';
+ if(key==='composition')return (m?m.shape+'取景。':'')+'主体位置、遮挡与边缘干扰等待看图判断。';
+ return m?(m.saturation<38?'色彩偏淡。':m.saturation>102?'色彩较浓。':'色彩浓淡适中。')+'氛围和瞬间尚未评审。':'氛围与瞬间尚未评审。';
+}
+function scorecard(r){
+ const ai=data.ai?.[r.id], ed=r.editorial, detailed=ai && Number.isFinite(ai.exposure);
+ const rel=ai?.peer?byId(ai.peer):r.comparison&&byId(r.comparison.peer);
+ const weak=!ai&&r.reason==='相似备选'&&r.comparison&&!r.comparison.match&&!ed&&!r.note;
+ const verdict=ai?.decision||(weak?'需并排复核':{'组内优选':'优先保留','相似备选':'可作备选','画质待核':'需复核','独立画面':'暂留'}[r.reason]||'待评');
+ const basis=ai?'AI 看图':ed?'看图复核':'本地测量';
+ const reason=(ai?.decision_note ? ai.decision_note+' '+ai.reason : ai?.reason)||ed?.reason||r.note||(weak?'同组里有相近取景，但与首选直接比对的证据不足，暂留这张。':rel?'与 '+rel.name+' 拍摄接近，组内已有优先保留的版本。':r.reason==='画质待核'?'本地测量提示可能有画质问题，请先确认主体和拍摄意图。':r.reason==='组内优选'?'按相机星级和预览表现排在本组前列，先作为对照。':'本地尚未发现更接近的替代画面。');
+ const rows=dimensions.map(([key,label])=>{
+  const legacy=ai && (key==='composition'?ai.composition_reason:key==='aesthetics'?ai.moment_reason:null);
+  const description=(detailed&&ai[key+'_reason'])||legacy||ed?.[key]||localReading(r,key);
+  return '<div class="rating-row"><dt>'+label+'</dt><dd>'+esc(description)+'</dd>'+(detailed?'<span>'+ai[key]+'<small>/25</small></span>':'')+'</div>';
+ }).join('');
+ const edit=ai?.edit_priority||ed?.edit_priority||'看原片再定';
+ const recovery=ai?.recovery_reason||ed?.recovery_reason||(r.clip>.18?'预览中有大面积高光或暗部接近截断；可先用 RAW 试拉曝光，看主体细节能否回来。':'可从原片检查亮暗余量与主体细节，预览无法确定修复上限。');
+ const crop=ai?.crop_reason||ed?.crop_reason||'尚未评估裁切；先看主体边缘是否完整。';
+ const priority=ai?.edit_reason||ed?.edit_reason||(rel?'先比较 '+rel.name+'；另一张若已满足用途，可省下修这张的时间。':'先确定这张是否值得分享，再决定投入。');
+ const rec=ai?.recovery||ed?.recovery||'需查原片', cropLabel=ai?.crop||ed?.crop||'待核对';
+ const source=ai?'AI 分享分':'本地技术分';
+ const tone=verdict==='疑似废片'?'risk':['精选','保留','优先保留'].includes(verdict)?'keep':'review';
+ return '<section class="rating-card" data-tone="'+tone+'"><div class="rating-heading"><div><small>'+basis+'</small><div class="decision-line"><h3>'+esc(verdict)+'</h3><span>'+esc(edit)+'</span></div></div><div class="rating-number">'+(ai?.score??r.score)+'<small>'+source+'</small></div></div><p class="rationale">'+esc(reason)+'</p>'+
+ (rel?'<p class="peerline">同组对照　'+esc(rel.name)+'</p>':'')+
+ '<dl class="ratings">'+rows+'</dl><div class="repair"><div><b>后期取舍</b><strong>'+esc(edit)+'</strong></div><p>'+esc(priority)+'</p><dl><dt>修复</dt><dd><b>'+esc(rec)+'</b>　'+esc(recovery)+'</dd><dt>裁切</dt><dd><b>'+esc(cropLabel)+'</b>　'+esc(crop)+'</dd></dl></div>'+
+ (ai?.uncertainty?'<p class="limit">判断限制　'+esc(ai.uncertainty)+'</p>':'')+
+ (ai?.alternative?'<details class="subrecord"><summary>另一种取舍</summary><p>'+esc(ai.alternative)+'</p></details>':'')+
+ (ai&&!detailed?'<details class="subrecord"><summary>原版 AI 评分</summary><p>主体与瞬间 '+ai.moment+'/40，构图 '+ai.composition+'/30，可见技术表现 '+ai.quality+'/30。'+esc(ai.quality_reason||'')+'</p></details>':'')+
+ '<details class="subrecord"><summary>技术分与初筛依据</summary>'+reviewEvidence(r)+'</details>'+
+ (ai?.signature?'<details class="subrecord audit-record" data-id="'+esc(r.id)+'"><summary>当次 AI 评审记录</summary><div class="audit-body"></div></details>':'')+'</section>';
+}
+async function loadAudit(details){
+ if(!details.open||details.dataset.loaded)return;
+ const r=byId(details.dataset.id), ai=data.ai?.[r.id], body=details.querySelector('.audit-body');
+ details.dataset.loaded='loading';body.textContent='读取本机记录…';
  try{
   const audit=await aiRequest('audit',{signature:ai.signature});
-  if(!dlg.open||area.dataset.active!==r.id)return;
   const idx=audit.attachments.findIndex(x=>x.id===r.id);
-  const photos=audit.attachments.map((x,i)=>{
-   const ref=byId(x.id);const role=x.id===r.id?'本张':x.id===ai.peer?'建议对照':'同批';
-   return '<figure><img src="'+source(ref)+'" alt="'+esc(ref.name)+'"><figcaption>'+(i+1)+' · '+esc(ref.name)+'<br>'+role+' · '+x.size.join(' × ')+'</figcaption></figure>';
-  }).join('');
-  area.insertAdjacentHTML('beforeend','<section><h3>当次评审记录</h3><p>'+esc(audit.model)+' · 策略 v'+esc(audit.policy)+' · '+(audit.mode==='subscription'?'ChatGPT 订阅':'API Key')+'<br>'+esc(new Date(audit.time).toLocaleString())+'</p>'+
-   '<div class="audit-photos">'+photos+'</div><details class="breakdown"><summary>查看实际提示词</summary>'+auditCopy(audit.prompt)+'</details>'+
-   '<details class="breakdown"><summary>查看本张原始返回与预览指纹</summary>'+auditCopy(JSON.stringify({photo:audit.raw.photos.find(x=>x.index===idx+1),attachment:audit.attachments[idx]},null,2))+'</details></section>');
- }catch(e){message(e.message)}
+  body.innerHTML='<p>'+esc(audit.model)+' · 策略 v'+esc(audit.policy)+' · '+esc(new Date(audit.time).toLocaleString())+'</p>'+
+  '<p>送评顺序　'+audit.attachments.map(x=>esc(byId(x.id)?.name||x.id)).join('、')+'</p>'+
+  '<details><summary>当次提示词</summary>'+auditCopy(audit.prompt)+'</details><details><summary>原始评语与预览指纹</summary>'+auditCopy(JSON.stringify({photo:audit.raw.photos.find(x=>x.index===idx+1),attachment:audit.attachments[idx]},null,2))+'</details>';
+  details.dataset.loaded='yes';
+ }catch(e){body.textContent=e.message;delete details.dataset.loaded}
 }
-$('closeWhy').onclick=()=>$('whyDialog').close();
+document.addEventListener('toggle',e=>{if(e.target.matches?.('.audit-record'))loadAudit(e.target)},true);
 
 let aiMode='subscription', aiFilter='', aiPlan=null, aiBusy=false, stopAI=false, aiProgress='';
 const aiLabels=['精选','保留','相似备选','疑似废片','需复核'];
@@ -245,7 +270,9 @@ async function aiRequest(route,body){
 async function prepareAI(scope,id){
  if(aiBusy)return;
  try{
-   const plan=await aiRequest('plan',{mode:aiMode,scope,id});
+   const g=groups[groupIndex];
+   const pair=scope==='pair'?[g[anchorIndex(g)].id,g[other].id]:undefined;
+   const plan=await aiRequest('plan',{mode:aiMode,scope,id,pair});plan.scope=scope;plan.originId=id;
    const total=plan.jobs.flat().length;
    if(!total){message('当前没有可评审的照片');return}
    aiPlan=plan;
@@ -256,7 +283,7 @@ async function prepareAI(scope,id){
 }
 async function runAI(){
  $('aiConsent').close();if(aiBusy||!aiPlan)return;
- const plan=aiPlan;aiPlan=null;aiBusy=true;stopAI=false;view='ai';page=0;month='';order='default';
+ const plan=aiPlan;aiPlan=null;aiBusy=true;stopAI=false;if(!['pair','group','one'].includes(plan.scope)){view='ai';page=0;month='';order='default';}
  let completed=0;
  try{
    for(const ids of plan.jobs){
@@ -267,7 +294,10 @@ async function runAI(){
    }
    aiProgress='已完成 '+completed+' / '+plan.jobs.length+' 批。'+(stopAI?'再次运行可复用已有结果。':'');
  }catch(e){aiProgress='已完成 '+completed+' 批。'+e.message}
- finally{aiBusy=false;render()}
+ finally{aiBusy=false;render();if(plan.scope==='one'){
+  const panel=[...document.querySelectorAll('.inline-review')].find(x=>x.dataset.photo===plan.originId);
+  if(panel)panel.open=true;
+ }if(['pair','group','one'].includes(plan.scope))message(aiProgress)}
 }
 $('aiCancel').onclick=()=>$('aiConsent').close();
 $('aiBegin').onclick=runAI;
@@ -279,6 +309,7 @@ fetch('/api').then(r=>r.json()).then(d=>{data=d;aiMode=d.aiMode||'subscription';
    const index=groups.findIndex(g=>g.some(r=>r.id===id));
    if(index>=0)enterGroup(index,id)
  }
+ if(!id && !listState().compare.length)view='all';
  const requested=new URLSearchParams(location.search).get('view');if(Object.hasOwn(views,requested))view=requested;
  render()}).catch(()=>{$('stage').textContent='无法读取本机片库，请重新打开照片管家。'});
 
@@ -299,3 +330,10 @@ function moveLoupe(event){
 }
 document.addEventListener('pointermove',moveLoupe);
 document.addEventListener('pointerdown',moveLoupe);
+
+function setMenu(open){
+ document.querySelector('.studio-side').classList.toggle('expanded',open);
+ $('menuToggle').setAttribute('aria-expanded',String(open));
+ $('menuToggle').textContent=open?'收起 ▴':'导航 ▾';
+}
+$('menuToggle').onclick=()=>setMenu($('menuToggle').getAttribute('aria-expanded')!=='true');

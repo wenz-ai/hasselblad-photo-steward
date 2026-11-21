@@ -17,12 +17,23 @@ def plan(rows, body):
     with database() as db:
         active = active_rows(rows, db)
         scope = body["scope"]
-        if scope == "group":
+        if scope == "one":
+            active=[r for r in active if r["id"]==body.get("id")]
+            if not active: raise ValueError("照片不可用。")
+        elif scope == "pair":
+            ids=body.get("pair",[])
+            if not isinstance(ids,list) or len(ids)!=2 or len(set(ids))!=2:
+                raise ValueError("请选择两张不同的对照片。")
+            lookup={r["id"]:r for r in active}
+            if not set(ids)<=lookup.keys() or lookup[ids[0]]["group"]!=lookup[ids[1]]["group"]:
+                raise ValueError("当前对照片已变化，请重新选择。")
+            active=[lookup[i] for i in ids]
+        elif scope == "group":
             group = rows[body["id"]]["group"]
             active = [r for r in active if r["group"] == group]
         elif scope not in ("trial","all"):
             raise ValueError("请选择本组、试选或整库。")
-        work = batches(active)
+        work = [active] if scope=="pair" else batches(active)
         if scope == "trial":
             example = next((g for g in reversed(work) if len(g)>1), work[-1] if work else [])
             work = [example] if example else []

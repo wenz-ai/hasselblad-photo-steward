@@ -81,6 +81,15 @@ def read_photo(files):
                                            mtime=p.stat().st_mtime_ns) for p in files])
 
 
+def meter_preview(bgr, gray, lap):
+    """Describe the preview in plain spatial terms; these are measurements, not subject detection."""
+    zones = [float(np.abs(cell).mean()) for strip in np.array_split(lap,3) for cell in np.array_split(strip,3,axis=1)]
+    hsv = cv2.cvtColor(bgr,cv2.COLOR_BGR2HSV)
+    return {"mid":int(np.median(gray)), "dark":round(float((gray<6).mean()),4),
+            "bright":round(float((gray>249).mean()),4), "textureZone":int(np.argmax(zones)),
+            "saturation":int(np.median(hsv[:,:,1])), "shape":"横幅" if gray.shape[1]>gray.shape[0] else "竖幅" if gray.shape[1]<gray.shape[0] else "方幅"}
+
+
 def measure(row):
     im = cv2.imread(str(PRE / (row['id']+'.jpg')))
     h,w = im.shape[:2]
@@ -99,6 +108,7 @@ def measure(row):
     score = round(float(np.clip(51 + detail_points + tone_points + clipping_points, 12, 98)))
     row.update(score=score, detail=round(detail, 1), clip=round(clip, 4), spread=round(spread, 1),
                parts=[round(detail_points, 3), round(tone_points, 3), round(clipping_points, 3)])
+    row["meter"] = meter_preview(small, gray, lap)
     tiny=cv2.resize(gray,(32,32),interpolation=cv2.INTER_AREA).astype('float32')
     dct=cv2.dct(tiny)[:8,:8].ravel()[1:]
     hsv=cv2.cvtColor(small,cv2.COLOR_BGR2HSV)
