@@ -10,7 +10,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from settings import ROOT, disk, session
+from settings import BASE, ROOT, disk, session
 
 DATA, config = session()
 SOURCE = Path(config["source"])
@@ -109,7 +109,7 @@ def remove_confirmed(db, catalog, selection):
     if queue!=selection or not queue:raise ValueError('清单已变化，请刷新后重新核对。')
     pending=db.execute('SELECT * FROM moves').fetchall()
     if pending:return finish_moves(db,pending,catalog,trash)
-    batch='X2D-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'-'+uuid.uuid4().hex[:6]
+    batch='PhotoSteward-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'-'+uuid.uuid4().hex[:6]
     moves=[]
     for ident,kind in queue.items():
         r=catalog[ident]
@@ -138,10 +138,40 @@ def mobile_list(rows,db,ai_ids=None):
         encoded=base64.b64encode(buf.getvalue()).decode()
         formats=' + '.join(Path(f['rel']).suffix[1:] for f in r['files'])
         entries.append(f'<article><img src="data:image/jpeg;base64,{encoded}"><div><b>{html.escape(r["name"])}</b><br>{r["date"]}<br>{formats}</div></article>')
-    template='''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>X2D 手机选片单</title><style>body{font:15px/1.6 -apple-system,sans-serif;background:#f2f5ee;color:#24382c;margin:20px auto;max-width:780px;padding:0 12px}article{display:flex;gap:18px;align-items:center;border-bottom:1px solid #c8d4c8;padding:8px 0}img{width:116px;height:90px;object-fit:contain;background:#27342d}b{font-size:18px}h1{margin-bottom:0}</style>'''
+    template='''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>哈苏手机选片单</title><style>body{font:15px/1.6 -apple-system,sans-serif;background:#f2f5ee;color:#24382c;margin:20px auto;max-width:780px;padding:0 12px}article{display:flex;gap:18px;align-items:center;border-bottom:1px solid #c8d4c8;padding:8px 0}img{width:116px;height:90px;object-fit:contain;background:#27342d}b{font-size:18px}h1{margin-bottom:0}</style>'''
     LIBRARY.mkdir(parents=True,exist_ok=True)
     dest=LIBRARY/('AI 精选单.html' if ai_ids is not None else '手机选片单.html')
     tmp=dest.with_suffix('.tmp')
-    tmp.write_text(template+f'<h1>X2D 手机选片单</h1><p>{len(chosen)} 张 · 按拍摄时间倒序，在 Phocus Mobile 对照原文件名选取。</p>'+''.join(entries)+'</html>')
+    tmp.write_text(template+f'<h1>哈苏手机选片单</h1><p>{len(chosen)} 张 · 按拍摄时间倒序，在 Phocus Mobile 对照原文件名选取。</p>'+''.join(entries)+'</html>')
     tmp.replace(dest)
     return dest
+
+
+def ai_preference(mode=None):
+    path = (BASE) / "preferences.json"
+    if mode is not None:
+        if mode not in ("subscription", "key"):
+            raise ValueError("请选择 ChatGPT 订阅或已登录的 API Key。")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp = path.with_suffix("." + uuid.uuid4().hex + ".tmp")
+        temp.write_text(json.dumps({"aiMode":mode}))
+        temp.replace(path)
+    if not path.exists():
+        return "subscription"
+    mode = json.loads(path.read_text()).get("aiMode")
+    return mode if mode in ("subscription","key") else "subscription"
+
+
+def set_group_picks(rows, db, group, selected, expected):
+    state = snapshots(db)
+    gone = {ident for ident,kind in state["removed"] if kind == "photo"}
+    members = [r for r in rows.values() if r["group"] == group and r["id"] not in gone]
+    ids = {r["id"] for r in members}
+    if len(members)<2 or not isinstance(selected,list) or not 1<=len(selected)<=2 or not set(selected)<=ids:
+        raise ValueError("请选择同组中可用的一至两张照片。")
+    current = {r["id"] for r in members if state["picks"].get(r["id"],bool(r.get("pick")))}
+    if current != set(expected):
+        raise ValueError("本组选片已在另一窗口修改，请刷新后重新核对。")
+    db.executemany("INSERT OR REPLACE INTO picks VALUES(?,?)", [(i,int(i in selected)) for i in ids])
+    db.executemany("DELETE FROM queue WHERE id=?", [(i,) for i in selected])
+    mobile_list(rows,db)

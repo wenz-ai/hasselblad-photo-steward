@@ -1,5 +1,6 @@
 import json
 import ai_service
+from library import ai_preference, set_group_picks
 import secrets
 import subprocess
 import webbrowser
@@ -35,7 +36,7 @@ class Handler(BaseHTTPRequestHandler):
         url=urlsplit(self.path).path
         if url=='/api':
             with database() as db:
-                self.output(dict(rows=list(ROWS.values()),**snapshots(db),ai=ai_service.results(db),token=TOKEN,library=str(LIBRARY)))
+                self.output(dict(rows=list(ROWS.values()),**snapshots(db),ai=ai_service.results(db),aiMode=ai_preference(),token=TOKEN,library=str(LIBRARY)))
         elif url.startswith('/p/') and url[3:] in ROWS:
             self.send(200,(DATA/'预览'/(url[3:]+'.jpg')).read_bytes(),'image/jpeg')
         elif url in ['/','/app.css','/app.js']:
@@ -51,6 +52,8 @@ class Handler(BaseHTTPRequestHandler):
             size=int(self.headers.get('Content-Length',0))
             if not 0<size<200000:raise ValueError('请求大小异常。')
             data=json.loads(self.rfile.read(size))
+            if self.path == '/preferences':
+                return self.output({'aiMode':ai_preference(data['mode'])})
             if self.path == '/ai/audit':
                 return self.output(ai_service.audit_for(data['signature']))
             if self.path == '/ai/plan':
@@ -68,6 +71,8 @@ class Handler(BaseHTTPRequestHandler):
                     db.execute('INSERT OR REPLACE INTO picks VALUES(?,?)',(ident,int(bool(data['on']))))
                     if data['on']:db.execute('DELETE FROM queue WHERE id=?',(ident,))
                     mobile_list(ROWS,db)
+                elif url=='/group-picks':
+                    set_group_picks(ROWS,db,data['group'],data['selected'],data['expected'])
                 elif url=='/queue':
                     kind=data.get('kind')
                     for ident in data['ids']:

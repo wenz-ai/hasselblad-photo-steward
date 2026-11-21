@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -57,6 +58,14 @@ class Workflow(unittest.TestCase):
                     headers={"Origin":url.rstrip("/"),"Content-Type":"application/json","X-Review-Token":state["token"]})
                 with urllib.request.urlopen(req, timeout=15) as res:return json.load(res)
             self.assertTrue(post("pick", {"id":pair["id"], "on":True})["picks"][pair["id"]])
+            self.assertEqual(post("preferences",{"mode":"key"})["aiMode"],"key")
+            members=[r for r in state["rows"] if r["group"]==pair["group"]]
+            before=json.loads(get("api"))
+            expected=[r["id"] for r in members if before["picks"].get(r["id"],bool(r.get("pick")))]
+            selected=post("group-picks",{"group":pair["group"],"expected":expected,"selected":[pair["id"]]})
+            self.assertEqual({r["id"] for r in members if selected["picks"][r["id"]]}, {pair["id"]})
+            with self.assertRaises(urllib.error.HTTPError):
+                post("group-picks",{"group":pair["group"],"expected":[],"selected":[pair["id"]]})
             queue = post("queue", {"ids":[pair["id"]], "kind":"photo"})["queue"]
             self.assertTrue((source/"frame.JPG").exists())
             proc.terminate()
@@ -64,6 +73,7 @@ class Workflow(unittest.TestCase):
             proc, url = launch("--last")
             state = json.loads(get("api"))
             self.assertEqual(state["queue"],queue)
+            self.assertEqual(state["aiMode"],"key")
             self.assertIn("frame", (Path(state["library"])/"手机选片单.html").read_text())
             # Exercise file moves without touching the actual macOS Trash.
             script = """from pathlib import Path

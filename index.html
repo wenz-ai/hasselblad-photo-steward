@@ -1,8 +1,10 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>照片管家 · X2D 审片台</title><link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script></head>
-<body><header><div class="brand"><i class="lens" aria-hidden="true"></i>照片管家</div><div class="camera"><b>X2D Photo Steward</b></div><button id="finder" class="plain">显示手机选片单 ↗</button></header>
-<div class="layout"><aside><div class="sidetitle">本次拍摄</div><div class="total" id="total">…</div><nav id="nav" aria-label="图库分类"></nav><div class="location"><span class="light"></span>本机图库<br><small>本次选片</small></div></aside>
-<main><div id="stage"></div></main></div>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>哈苏照片管家 · Photo Steward</title><link rel="stylesheet" href="/app.css"><script src="/app.js" defer></script></head>
+<body>
+<header class="mast"><div class="brand"><i class="lens" aria-hidden="true"></i><b>哈苏照片管家</b><span>Photo Steward</span></div><div class="mast-actions"><span class="library-total" id="total"></span><button id="finder">手机选片单 ↗</button><button id="settings">设置</button></div></header>
+<nav id="nav" aria-label="图库分类"></nav>
+<main id="stage"></main>
+<dialog id="preferences"><h2>设置</h2><form id="prefForm"><label for="aiMode">Codex 登录方式</label><select id="aiMode"><option value="subscription">ChatGPT 订阅</option><option value="key">已登录的 API Key</option></select><p>所有本机片库共用。API Key 模式按 API 用量计费。</p><div class="confirm-actions"><button type="button" id="cancelPref">取消</button><button type="submit" class="primary">保存设置</button></div></form></dialog>
 <dialog id="zoom"><button id="closeZoom" class="close" aria-label="关闭大图">×</button><img id="zoomImage" alt=""><div id="zoomCaption"></div></dialog>
 <dialog id="confirmDialog"><h2>移入废纸篓？</h2><p id="confirmText"></p><div class="confirm-actions"><button id="cancel">返回核对</button><button class="danger" id="confirmRemove">确认移入废纸篓</button></div></dialog>
 <dialog id="whyDialog"><div id="whyContent"></div><button id="closeWhy">关闭</button></dialog>

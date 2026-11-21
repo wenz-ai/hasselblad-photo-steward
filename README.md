@@ -1,4 +1,4 @@
-# X2D 照片管家
+# 哈苏照片管家 · Hasselblad Photo Steward
 
 给在 Mac 上挑照片、在手机 Phocus 里加水印分享的人。插上相机或读卡器，在本地审片台并排比较连拍，把喜欢的照片加进一张带缩略图和原文件名的手机选片单。
 
@@ -6,15 +6,15 @@
 
 在 Mac 的 Codex 桌面 App 里打开一个空的本地工作文件夹，把下面这句话发给它：
 
-> 帮我下载 https://github.com/wenz-ai/x2d-photo-steward 的公开源码到当前文件夹，读项目里的 AGENTS.md，然后用 /bin/sh bootstrap.sh --no-open 启动照片管家。把实际的本地审片地址打开给我。相机已经连上，我自己确认删除。
+> 帮我下载 https://github.com/wenz-ai/hasselblad-photo-steward 的公开源码到当前文件夹，读项目里的 AGENTS.md，然后用 /bin/sh bootstrap.sh --no-open 启动照片管家。把实际的本地审片地址打开给我。相机已经连上，我自己确认删除。
 
-也可以在这句话末尾给出照片文件夹。下载源码可以直接使用 [GitHub ZIP](https://github.com/wenz-ai/x2d-photo-steward/archive/refs/heads/main.zip)。第一次运行需要联网下载运行环境，并允许访问自己选的照片目录。启动器会校验下载的 uv 引导程序，用锁文件安装私有 Python 环境。用户无需手装 Git、Homebrew、Python、OpenCV 或 Phocus，也无需配置 OpenAI API Key。
+也可以在这句话末尾给出照片文件夹。下载源码可以直接使用 [GitHub ZIP](https://github.com/wenz-ai/hasselblad-photo-steward/archive/refs/heads/main.zip)。第一次运行需要联网下载运行环境，并允许访问自己选的照片目录。启动器会校验下载的 uv 引导程序，用锁文件安装私有 Python 环境。用户无需手装 Git、Homebrew、Python、OpenCV 或 Phocus，也无需配置 OpenAI API Key。
 
 本版面向 macOS，已在 Apple Silicon Mac 上验证。需要本地执行权限，运行环境按 macOS 14 或更新版本准备；Intel Mac 尚未实机测试。网页只监听本机回环地址。Phocus Mobile 是导出哈苏水印时的可选后续步骤。
 
 ## 让 AI 看图
 
-进入「AI 选片」，选择「ChatGPT 订阅」，先试一组或评审整库。也可以在相似对照里只评当前组。照片管家调用本机官方 Codex CLI 的图片输入；支持使用订阅额度的 ChatGPT 账号即可工作。它会检查登录方式，不会自动切换到按量计费。若想用 API Key，在官方 CLI 中完成 Key 登录，然后在界面选相应模式。[Codex 登录方式](https://developers.openai.com/codex/auth) · [非交互运行](https://developers.openai.com/codex/noninteractive)
+进入「AI 选片」即可先试一组或评审整库。登录方式默认 ChatGPT 订阅，可在右上角「设置」更改；选择保存在本机，所有片库共用。也可以在相似对照里只评当前组。照片管家调用本机官方 Codex CLI 的图片输入；支持使用订阅额度的 ChatGPT 账号即可工作。它会检查登录方式，不会自动切换到按量计费。若想用 API Key，在官方 CLI 中完成 Key 登录，然后在设置中选相应模式。[Codex 登录方式](https://developers.openai.com/codex/auth) · [非交互运行](https://developers.openai.com/codex/noninteractive)
 
 确认框会列出本次张数、批次、缓存命中数、文件名和选片策略。确认后，最长边 1200 像素、去掉 EXIF 的 JPEG 预览会通过 Codex 发往 OpenAI。推理消耗对应账号的额度。默认采用 Codex 配置中的模型；也可以在启动时通过 `PHOTO_STEWARD_MODEL` 指定该账号有权限的视觉模型。找不到 CLI 时可从桌面 App 启用它或安装官方 Codex CLI。
 
@@ -30,11 +30,11 @@
 ## 怎么挑
 
 1. **分享精选**先展示相机星级、预览技术分靠前的候选。点星星增减入选照片。
-2. **相似对照**固定显示组内首选，点下方缩略图切换右侧照片，点大图放大预览。**淘汰候选**优先展示画质疑点，再按技术分从低到高排。
+2. **相似对照**把两张照片放在同样大小的画框中。左图可固定，更换参照时点「右图设为参照」。底片按拍摄顺序排列，← → 切换右图，Shift + ← → 切换组。「同步放大 2×」可移动或轻触查看两张预览的相同相对位置。选「只选左图」「两张都选」或「只选右图」，会替换本组的分享精选并更新手机选片单。其他组和相机原件保留。**淘汰候选**优先展示画质疑点，再按技术分从低到高排。
 3. **显示手机选片单**会在 Finder 定位到独立 HTML。可自行传到手机，对照缩略图、日期和原文件名，在 Phocus Mobile 选择相机原片。网页里的预览最长边为 1440 像素。
 4. **待移除**只做标记。进入**移除清单**后会列出张数、文件数、体积及各自的格式，最终确认才将对应原件移入来源磁盘的废纸篓。同目录、同名的 3FR 和 HEIC/JPG 一起处理。
 
-支持 X2D 3FR 内嵌预览、JPG/JPEG 和 HEIC/HEIF。无法解码的拍摄组会跳过，并在该片库的 `skipped.json` 记录原因。本地初筛和预览生成在本机完成。启用「AI 选片」并确认发送范围后，Codex 才会收到对应预览。
+支持带兼容内嵌 JPEG 预览的 3FR，以及 JPG/JPEG、HEIC/HEIF。X2D 100C 已实机验证，其他哈苏机型的 RAW 兼容性需要按样片验证。无法解码的拍摄组会跳过，并在该片库的 `skipped.json` 记录原因。本地初筛和预览生成在本机完成。启用「AI 选片」并确认发送范围后，Codex 才会收到对应预览。
 
 ## 推荐是怎么来的
 

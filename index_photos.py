@@ -1,4 +1,4 @@
-"""Build the offline X2D catalog. All camera accesses in this module are read-only."""
+"""Build the offline Hasselblad photo catalog. All camera accesses in this module are read-only."""
 import concurrent.futures
 import io
 import hashlib
