@@ -28,6 +28,9 @@ def database():
     db.row_factory=sqlite3.Row
     try:
         db.executescript("""
+        CREATE TABLE IF NOT EXISTS ai_audit(signature TEXT PRIMARY KEY, details TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS ai_batches(signature TEXT PRIMARY KEY, result TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS ai_photos(id TEXT PRIMARY KEY, result TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS picks(id TEXT PRIMARY KEY, chosen INTEGER);
         CREATE TABLE IF NOT EXISTS queue(id TEXT PRIMARY KEY, kind TEXT);
         CREATE TABLE IF NOT EXISTS removed(id TEXT, kind TEXT, stamp TEXT, PRIMARY KEY(id,kind));
@@ -120,12 +123,12 @@ def remove_confirmed(db, catalog, selection):
     finish_moves(db,db.execute('SELECT * FROM moves').fetchall(),catalog,trash)
 
 
-def mobile_list(rows,db):
+def mobile_list(rows,db,ai_ids=None):
     import base64
     import html
     import io
     state=snapshots(db); picks=state['picks']; gone={i for i,_ in state['removed']}
-    chosen=[r for r in rows.values() if r['id'] not in gone and picks.get(r['id'],bool(r.get('pick')))]
+    chosen=[r for r in rows.values() if r['id'] not in gone and (r["id"] in ai_ids if ai_ids is not None else picks.get(r['id'],bool(r.get('pick'))))]
     chosen.sort(key=lambda r:r['date'],reverse=True)
     entries=[]
     for r in chosen:
@@ -137,7 +140,8 @@ def mobile_list(rows,db):
         entries.append(f'<article><img src="data:image/jpeg;base64,{encoded}"><div><b>{html.escape(r["name"])}</b><br>{r["date"]}<br>{formats}</div></article>')
     template='''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>X2D 手机选片单</title><style>body{font:15px/1.6 -apple-system,sans-serif;background:#f2f5ee;color:#24382c;margin:20px auto;max-width:780px;padding:0 12px}article{display:flex;gap:18px;align-items:center;border-bottom:1px solid #c8d4c8;padding:8px 0}img{width:116px;height:90px;object-fit:contain;background:#27342d}b{font-size:18px}h1{margin-bottom:0}</style>'''
     LIBRARY.mkdir(parents=True,exist_ok=True)
-    dest=LIBRARY/'手机选片单.html'
+    dest=LIBRARY/('AI 精选单.html' if ai_ids is not None else '手机选片单.html')
     tmp=dest.with_suffix('.tmp')
     tmp.write_text(template+f'<h1>X2D 手机选片单</h1><p>{len(chosen)} 张 · 按拍摄时间倒序，在 Phocus Mobile 对照原文件名选取。</p>'+''.join(entries)+'</html>')
     tmp.replace(dest)
+    return dest

@@ -1,4 +1,5 @@
 import json
+import ai_service
 import secrets
 import subprocess
 import webbrowser
@@ -34,7 +35,7 @@ class Handler(BaseHTTPRequestHandler):
         url=urlsplit(self.path).path
         if url=='/api':
             with database() as db:
-                self.output(dict(rows=list(ROWS.values()),**snapshots(db),token=TOKEN,library=str(LIBRARY)))
+                self.output(dict(rows=list(ROWS.values()),**snapshots(db),ai=ai_service.results(db),token=TOKEN,library=str(LIBRARY)))
         elif url.startswith('/p/') and url[3:] in ROWS:
             self.send(200,(DATA/'预览'/(url[3:]+'.jpg')).read_bytes(),'image/jpeg')
         elif url in ['/','/app.css','/app.js']:
@@ -50,6 +51,12 @@ class Handler(BaseHTTPRequestHandler):
             size=int(self.headers.get('Content-Length',0))
             if not 0<size<200000:raise ValueError('请求大小异常。')
             data=json.loads(self.rfile.read(size))
+            if self.path == '/ai/audit':
+                return self.output(ai_service.audit_for(data['signature']))
+            if self.path == '/ai/plan':
+                return self.output(ai_service.plan(ROWS,data))
+            if self.path == '/ai/batch':
+                return self.output(ai_service.run_batch(ROWS,data))
             with writer(),database() as db:
                 url=self.path
                 if db.execute('SELECT 1 FROM moves LIMIT 1').fetchone() and url!='/remove':
@@ -72,6 +79,11 @@ class Handler(BaseHTTPRequestHandler):
                 elif url=='/remove' and data.get('confirm')=='移入废纸篓':
                     remove_confirmed(db,ROWS,data['selection'])
                     mobile_list(ROWS,db)
+                elif url=='/ai/export':
+                    ids={key for key,r in ai_service.results(db).items() if r['decision']=='精选'}
+                    if not ids:raise ValueError('当前没有 AI 精选。')
+                    target=mobile_list(ROWS,db,ids)
+                    subprocess.run(['open','-R',str(target)],check=True)
                 elif url=='/finder':
                     subprocess.run(['open','-R',str(LIBRARY/'手机选片单.html')],check=True)
                 else:raise ValueError('操作无效。')
